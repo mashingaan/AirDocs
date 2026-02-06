@@ -1,0 +1,38 @@
+# AirDocs - Requirements
+# Python 3.11+
+
+# UI Framework
+PySide6>=6.6.0
+
+# Database
+# SQLite is built-in, no external package needed
+
+# Document Generation
+docxtpl>=0.16.0          # Word template filling (Jinja2-based)
+openpyxl>=3.1.0          # Excel generation/manipulation
+pypdf>=3.17.0            # PDF reading, merging, AcroForm detection
+reportlab>=4.0.0         # PDF overlay generation
+
+# Office COM Automation (Windows only)
+pywin32>=306             # win32com for Word/Excel/Outlook COM
+
+# Configuration
+PyYAML>=6.0              # YAML config files
+
+# Utilities
+python-dateutil>=2.8.0   # Date parsing and formatting
+num2words>=0.5.12        # Numbers to words (for invoice amounts)
+
+# HTTP Requests
+requests>=2.31.0         # GitHub API, update checker
+
+# Testing
+pytest>=7.4.0
+pytest-cov>=4.1.0
+pytest-qt>=4.2.0         # Qt testing
+
+# Build/Distribution
+pyinstaller>=6.0.0       # Executable packaging
+
+# Optional: LibreOffice conversion fallback
+# (LibreOffice must be installed separately on the system)

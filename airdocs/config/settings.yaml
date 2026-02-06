@@ -1,0 +1,118 @@
+# AirDocs - Application Settings
+# =====================================
+
+application:
+  name: "Рабочее место экспедитора"
+  version: "0.1.0"
+  language: "ru"
+
+# Paths configuration
+paths:
+  # Base data directory (relative to app or absolute)
+  data_dir: "data"
+  # Output directory for generated documents
+  output_dir: "data/output"
+  # Database file
+  database: "data/awb_dispatcher.db"
+  # Logs directory
+  logs_dir: "data/logs"
+  # Templates directory
+  templates_dir: "templates"
+
+# Templates paths (relative to templates_dir)
+templates:
+  word:
+    invoice: "word/invoice_template.docx"
+    upd: "word/upd_template.docx"
+    act: "word/act_template.docx"
+    waybill: "word/waybill_template.docx"
+  excel:
+    registry_1c: "excel/registry_1c_template.xlsx"
+    invoice_set: "excel/invoice_set_template.xlsx"
+  pdf:
+    awb_blank: "pdf/awb_blank.pdf"
+  email:
+    default_body: "email/default_email_body.html"
+
+# AWB PDF overlay coordinates (calibrated for standard AWB form)
+# Coordinates in points (1 point = 1/72 inch), origin at bottom-left
+awb_overlay:
+  # Page size (A4 landscape for AWB)
+  page_width: 842  # A4 landscape width in points
+  page_height: 595  # A4 landscape height in points
+  # Font settings
+  font_name: "Helvetica"
+  font_size: 10
+  font_size_small: 8
+  # Field coordinates: {field_name: [x, y]}
+  # These are DEFAULT coordinates - should be calibrated with real AWB template
+  coordinates:
+    awb_number: [380, 550]
+    shipment_date: [380, 530]
+    shipper_name: [50, 480]
+    shipper_address: [50, 460]
+    shipper_inn: [50, 440]
+    consignee_name: [50, 380]
+    consignee_address: [50, 360]
+    agent_name: [450, 480]
+    weight_kg: [600, 350]
+    pieces: [650, 350]
+    volume_m3: [700, 350]
+    goods_description: [50, 280]
+
+# Office integration settings
+office:
+  # Timeout for COM operations (seconds)
+  com_timeout: 30
+  # Retry attempts for COM operations
+  com_retries: 3
+  # Delay between retries (seconds)
+  retry_delay: 1
+
+# LibreOffice fallback settings
+libreoffice:
+  # Common installation paths (Windows)
+  install_paths:
+    - "C:\\Program Files\\LibreOffice\\program\\soffice.exe"
+    - "C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe"
+  # Conversion timeout (seconds)
+  conversion_timeout: 60
+
+# AWB Editor integration (placeholder - configure when details known)
+awb_editor:
+  enabled: false
+  executable_path: ""
+  # Import format: csv, xml, json, fdf
+  import_format: "csv"
+  # Export format
+  export_format: "pdf"
+  # Working directory for file exchange
+  exchange_dir: "data/awb_editor_exchange"
+
+# Document generation settings
+documents:
+  # Default document status after generation
+  default_status: "generated"
+  # Hash algorithm for file integrity
+  hash_algorithm: "sha256"
+  # Version separator for filenames
+  version_separator: "_v"
+
+# UI settings
+ui:
+  # Window size
+  window_width: 1200
+  window_height: 800
+  # Date format for display
+  date_format: "%d.%m.%Y"
+  # Number formats
+  decimal_separator: ","
+  thousands_separator: " "
+
+# Update system settings
+updater:
+  manifest_url: "https://example.com/awb/manifest.json"
+  github_repo: "mashingaan/AirDocs"
+  channel: "latest"  # "latest" or "stable"
+  check_on_startup: true
+  check_timeout: 30  # seconds

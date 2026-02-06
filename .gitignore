@@ -1,0 +1,21 @@
+﻿# Build artifacts
+airdocs/build/
+airdocs/dist/
+
+# Python cache
+__pycache__/
+**/__pycache__/
+*.pyc
+
+# Generated version info
+airdocs/version_info.txt
+
+# Local data/logs
+airdocs/data/logs/
+airdocs/data/*.db
+airdocs/data/*.db.*
+airdocs/data/output/
+
+# Tooling caches
+.pytest_cache/
+.claude/

@@ -1,0 +1,9 @@
+     УНИВЕРСАЛЬНЫЙ ПЕРЕДАТОЧНЫЙ ДОКУМЕНТ
+Номер: {{ upd_number }}
+Дата: {{ upd_date }}Продавец: {{ seller_name }}
+ИНН/КПП: {{ seller_inn }} / {{ seller_kpp }}Адрес: {{ seller_address }}Покупатель: {{ buyer_name }}
+ИНН/КПП: {{ buyer_inn }} / {{ buyer_kpp }}Адрес: {{ buyer_address }}Основание: Договор № {{ contract_number }} от {{ contract_date }}
+AWB: {{ awb_number }}№
+НаименованиеЕд.Кол-воЦенаСумма1{{ service_description }}шт{{ quantity }}{{ unit_price }}{{ total_amount }}Итого: {{ total_amount }} руб., в т.ч. НДС {{ vat_amount }} руб.
+Товар (услуга) передал: _____________ / {{ seller_signatory }} /
+Товар (услугу) принял: _____________ / {{ buyer_signatory }} /

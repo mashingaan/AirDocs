@@ -1,0 +1,10 @@
+                       СЧЕТ № {{ invoice_number }}
+                            от {{ invoice_date }}
+Поставщик: {{ seller_name }}
+ИНН/КПП: {{ seller_inn }} / {{ seller_kpp }}Адрес: {{ seller_address }}Покупатель: {{ buyer_name }}
+ИНН/КПП: {{ buyer_inn }} / {{ buyer_kpp }}Адрес: {{ buyer_address }}AWB: {{ awb_number }}
+Маршрут: {{ departure_airport }} - {{ destination_airport }}№
+Наименование услугиКол-воЦенаСумма1{{ service_description }}{{ quantity }}{{ unit_price }}{{ total_amount }}                                         Итого: {{ total_amount }} руб.
+Сумма прописью: {{ total_amount_words }}
+Поставщик: _____________ / {{ seller_signatory }} /
+Покупатель: _____________ / {{ buyer_signatory }} /

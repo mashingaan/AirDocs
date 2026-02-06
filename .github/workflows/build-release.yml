@@ -1,0 +1,70 @@
+﻿name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'  # Триггер на теги вида v0.1.4
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          cd airdocs
+          pip install -r requirements.txt
+      
+      - name: Extract version from tag
+        id: get_version
+        shell: bash
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building version: $VERSION"
+      
+      - name: Build with PyInstaller
+        run: |
+          cd airdocs
+          python scripts/generate_version_info.py
+          pyinstaller AirDocs.spec --noconfirm
+      
+      - name: Create ZIP archive
+        run: |
+          cd airdocs
+          Compress-Archive -Path "dist\AirDocs\*" -DestinationPath "dist\AirDocs_${{ steps.get_version.outputs.VERSION }}.zip"
+      
+      - name: Generate changelog
+        id: changelog
+        uses: mikepenz/release-changelog-builder-action@v4
+        with:
+          configuration: ".github/changelog-config.json"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            airdocs/dist/AirDocs_${{ steps.get_version.outputs.VERSION }}.zip
+            airdocs/dist/AirDocs/AirDocs_${{ steps.get_version.outputs.VERSION }}.exe
+          body: ${{ steps.changelog.outputs.changelog }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: AirDocs-${{ steps.get_version.outputs.VERSION }}
+          path: airdocs/dist/AirDocs_${{ steps.get_version.outputs.VERSION }}.zip
+          retention-days: 30

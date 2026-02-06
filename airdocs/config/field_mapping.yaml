@@ -1,0 +1,541 @@
+# AirDocs - Canonical Field Mapping
+# =========================================
+# SINGLE SOURCE OF TRUTH for all field definitions
+# All data flows: UI -> DB -> Templates -> PDF use these canonical keys
+#
+# Structure for each field:
+#   canonical_key:
+#     ui_label: "Label shown in UI (Russian)"
+#     ui_label_en: "Label shown in UI (English)"
+#     type: string|integer|float|date|boolean
+#     required: true|false
+#     db_column: "column_name in SQLite"
+#     db_table: "table_name"
+#     word_placeholder: "{{ jinja2_placeholder }}"
+#     excel_cell: "Cell reference (for simple templates)"
+#     awb_field: "AcroForm field name (if exists)"
+#     validation:
+#       pattern: "regex pattern"
+#       min: minimum value
+#       max: maximum value
+#       min_length: minimum string length
+#       max_length: maximum string length
+
+fields:
+  # ==========================================
+  # SHIPMENT CORE FIELDS
+  # ==========================================
+
+  awb_number:
+    ui_label: "Номер AWB"
+    ui_label_en: "AWB Number"
+    type: string
+    required: true
+    db_column: "awb_number"
+    db_table: "shipments"
+    word_placeholder: "{{ awb_number }}"
+    excel_cell: "A2"
+    awb_field: "AWB_Number"
+    validation:
+      pattern: "^[0-9]{3}-[0-9]{8}$|^[0-9]{8,11}$"
+      min_length: 8
+      max_length: 12
+
+  shipment_date:
+    ui_label: "Дата отправления"
+    ui_label_en: "Shipment Date"
+    type: date
+    required: true
+    db_column: "shipment_date"
+    db_table: "shipments"
+    word_placeholder: "{{ shipment_date }}"
+    excel_cell: "B2"
+    awb_field: "Date"
+    format:
+      display: "%d.%m.%Y"
+      db: "%Y-%m-%d"
+      word: "%d.%m.%Y"
+
+  shipment_type:
+    ui_label: "Тип отправления"
+    ui_label_en: "Shipment Type"
+    type: string
+    required: true
+    db_column: "shipment_type"
+    db_table: "shipments"
+    word_placeholder: "{{ shipment_type }}"
+    allowed_values:
+      - air
+      - local_delivery
+    default: "air"
+
+  status:
+    ui_label: "Статус"
+    ui_label_en: "Status"
+    type: string
+    required: true
+    db_column: "status"
+    db_table: "shipments"
+    word_placeholder: "{{ status }}"
+    allowed_values:
+      - draft
+      - ready
+      - sent
+      - archived
+    default: "draft"
+
+  # ==========================================
+  # WEIGHT AND DIMENSIONS
+  # ==========================================
+
+  weight_kg:
+    ui_label: "Вес (кг)"
+    ui_label_en: "Weight (kg)"
+    type: float
+    required: true
+    db_column: "weight_kg"
+    db_table: "shipments"
+    word_placeholder: "{{ weight_kg }}"
+    excel_cell: "C2"
+    awb_field: "Weight"
+    validation:
+      min: 0.001
+      max: 999999.999
+    format:
+      decimal_places: 3
+
+  pieces:
+    ui_label: "Количество мест"
+    ui_label_en: "Number of Pieces"
+    type: integer
+    required: true
+    db_column: "pieces"
+    db_table: "shipments"
+    word_placeholder: "{{ pieces }}"
+    excel_cell: "D2"
+    awb_field: "Pieces"
+    validation:
+      min: 1
+      max: 99999
+
+  volume_m3:
+    ui_label: "Объем (м³)"
+    ui_label_en: "Volume (m³)"
+    type: float
+    required: false
+    db_column: "volume_m3"
+    db_table: "shipments"
+    word_placeholder: "{{ volume_m3 }}"
+    excel_cell: "E2"
+    awb_field: "Volume"
+    validation:
+      min: 0.001
+      max: 9999.999
+    format:
+      decimal_places: 3
+
+  goods_description:
+    ui_label: "Описание товара"
+    ui_label_en: "Goods Description"
+    type: string
+    required: false
+    db_column: "goods_description"
+    db_table: "shipments"
+    word_placeholder: "{{ goods_description }}"
+    excel_cell: "F2"
+    awb_field: "Goods_Description"
+    validation:
+      max_length: 500
+
+  # ==========================================
+  # SHIPPER (ОТПРАВИТЕЛЬ) FIELDS
+  # ==========================================
+
+  shipper_name:
+    ui_label: "Наименование отправителя"
+    ui_label_en: "Shipper Name"
+    type: string
+    required: true
+    db_column: "name"
+    db_table: "parties"
+    db_filter: "party_type = 'shipper'"
+    word_placeholder: "{{ shipper_name }}"
+    excel_cell: "A5"
+    awb_field: "Shipper_Name"
+    validation:
+      min_length: 1
+      max_length: 200
+
+  shipper_address:
+    ui_label: "Адрес отправителя"
+    ui_label_en: "Shipper Address"
+    type: string
+    required: false
+    db_column: "address"
+    db_table: "parties"
+    db_filter: "party_type = 'shipper'"
+    word_placeholder: "{{ shipper_address }}"
+    excel_cell: "A6"
+    awb_field: "Shipper_Address"
+    validation:
+      max_length: 300
+
+  shipper_inn:
+    ui_label: "ИНН отправителя"
+    ui_label_en: "Shipper TIN"
+    type: string
+    required: false
+    db_column: "inn"
+    db_table: "parties"
+    db_filter: "party_type = 'shipper'"
+    word_placeholder: "{{ shipper_inn }}"
+    excel_cell: "A7"
+    awb_field: "Shipper_INN"
+    validation:
+      pattern: "^[0-9]{10}$|^[0-9]{12}$"
+
+  shipper_kpp:
+    ui_label: "КПП отправителя"
+    ui_label_en: "Shipper KPP"
+    type: string
+    required: false
+    db_column: "kpp"
+    db_table: "parties"
+    db_filter: "party_type = 'shipper'"
+    word_placeholder: "{{ shipper_kpp }}"
+    excel_cell: "A8"
+    validation:
+      pattern: "^[0-9]{9}$"
+
+  shipper_contact:
+    ui_label: "Контактное лицо отправителя"
+    ui_label_en: "Shipper Contact Person"
+    type: string
+    required: false
+    db_column: "contact_person"
+    db_table: "parties"
+    db_filter: "party_type = 'shipper'"
+    word_placeholder: "{{ shipper_contact }}"
+
+  shipper_phone:
+    ui_label: "Телефон отправителя"
+    ui_label_en: "Shipper Phone"
+    type: string
+    required: false
+    db_column: "phone"
+    db_table: "parties"
+    db_filter: "party_type = 'shipper'"
+    word_placeholder: "{{ shipper_phone }}"
+
+  shipper_email:
+    ui_label: "Email отправителя"
+    ui_label_en: "Shipper Email"
+    type: string
+    required: false
+    db_column: "email"
+    db_table: "parties"
+    db_filter: "party_type = 'shipper'"
+    word_placeholder: "{{ shipper_email }}"
+    validation:
+      pattern: "^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\\.[a-zA-Z0-9-.]+$"
+
+  # ==========================================
+  # CONSIGNEE (ПОЛУЧАТЕЛЬ) FIELDS
+  # ==========================================
+
+  consignee_name:
+    ui_label: "Наименование получателя"
+    ui_label_en: "Consignee Name"
+    type: string
+    required: true
+    db_column: "name"
+    db_table: "parties"
+    db_filter: "party_type = 'consignee'"
+    word_placeholder: "{{ consignee_name }}"
+    excel_cell: "A10"
+    awb_field: "Consignee_Name"
+    validation:
+      min_length: 1
+      max_length: 200
+
+  consignee_address:
+    ui_label: "Адрес получателя"
+    ui_label_en: "Consignee Address"
+    type: string
+    required: false
+    db_column: "address"
+    db_table: "parties"
+    db_filter: "party_type = 'consignee'"
+    word_placeholder: "{{ consignee_address }}"
+    excel_cell: "A11"
+    awb_field: "Consignee_Address"
+    validation:
+      max_length: 300
+
+  consignee_inn:
+    ui_label: "ИНН получателя"
+    ui_label_en: "Consignee TIN"
+    type: string
+    required: false
+    db_column: "inn"
+    db_table: "parties"
+    db_filter: "party_type = 'consignee'"
+    word_placeholder: "{{ consignee_inn }}"
+    excel_cell: "A12"
+    validation:
+      pattern: "^[0-9]{10}$|^[0-9]{12}$"
+
+  consignee_kpp:
+    ui_label: "КПП получателя"
+    ui_label_en: "Consignee KPP"
+    type: string
+    required: false
+    db_column: "kpp"
+    db_table: "parties"
+    db_filter: "party_type = 'consignee'"
+    word_placeholder: "{{ consignee_kpp }}"
+    validation:
+      pattern: "^[0-9]{9}$"
+
+  consignee_contact:
+    ui_label: "Контактное лицо получателя"
+    ui_label_en: "Consignee Contact Person"
+    type: string
+    required: false
+    db_column: "contact_person"
+    db_table: "parties"
+    db_filter: "party_type = 'consignee'"
+    word_placeholder: "{{ consignee_contact }}"
+
+  consignee_phone:
+    ui_label: "Телефон получателя"
+    ui_label_en: "Consignee Phone"
+    type: string
+    required: false
+    db_column: "phone"
+    db_table: "parties"
+    db_filter: "party_type = 'consignee'"
+    word_placeholder: "{{ consignee_phone }}"
+
+  consignee_email:
+    ui_label: "Email получателя"
+    ui_label_en: "Consignee Email"
+    type: string
+    required: false
+    db_column: "email"
+    db_table: "parties"
+    db_filter: "party_type = 'consignee'"
+    word_placeholder: "{{ consignee_email }}"
+    validation:
+      pattern: "^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\\.[a-zA-Z0-9-.]+$"
+
+  # ==========================================
+  # AGENT FIELDS
+  # ==========================================
+
+  agent_name:
+    ui_label: "Наименование агента"
+    ui_label_en: "Agent Name"
+    type: string
+    required: false
+    db_column: "name"
+    db_table: "parties"
+    db_filter: "party_type = 'agent'"
+    word_placeholder: "{{ agent_name }}"
+    awb_field: "Agent_Name"
+
+  agent_address:
+    ui_label: "Адрес агента"
+    ui_label_en: "Agent Address"
+    type: string
+    required: false
+    db_column: "address"
+    db_table: "parties"
+    db_filter: "party_type = 'agent'"
+    word_placeholder: "{{ agent_address }}"
+
+  # ==========================================
+  # INVOICE / FINANCIAL FIELDS
+  # ==========================================
+
+  invoice_number:
+    ui_label: "Номер счета"
+    ui_label_en: "Invoice Number"
+    type: string
+    required: true
+    word_placeholder: "{{ invoice_number }}"
+    excel_cell: "A2"
+    format:
+      pattern: "СЧ-{seq:03d}/{year}"
+
+  invoice_date:
+    ui_label: "Дата счета"
+    ui_label_en: "Invoice Date"
+    type: date
+    required: true
+    word_placeholder: "{{ invoice_date }}"
+    excel_cell: "B2"
+    format:
+      display: "%d.%m.%Y"
+
+  invoice_amount:
+    ui_label: "Сумма счета"
+    ui_label_en: "Invoice Amount"
+    type: float
+    required: true
+    word_placeholder: "{{ invoice_amount }}"
+    excel_cell: "G2"
+    format:
+      decimal_places: 2
+      currency: "RUB"
+
+  invoice_amount_words:
+    ui_label: "Сумма прописью"
+    ui_label_en: "Amount in Words"
+    type: string
+    required: false
+    word_placeholder: "{{ invoice_amount_words }}"
+    # Auto-generated from invoice_amount
+
+  invoice_vat:
+    ui_label: "НДС"
+    ui_label_en: "VAT"
+    type: float
+    required: false
+    word_placeholder: "{{ invoice_vat }}"
+    format:
+      decimal_places: 2
+
+  invoice_total:
+    ui_label: "Итого с НДС"
+    ui_label_en: "Total with VAT"
+    type: float
+    required: false
+    word_placeholder: "{{ invoice_total }}"
+    format:
+      decimal_places: 2
+
+  # ==========================================
+  # DOCUMENT METADATA FIELDS
+  # ==========================================
+
+  document_number:
+    ui_label: "Номер документа"
+    ui_label_en: "Document Number"
+    type: string
+    required: true
+    db_column: "id"
+    db_table: "documents"
+    word_placeholder: "{{ document_number }}"
+
+  document_date:
+    ui_label: "Дата документа"
+    ui_label_en: "Document Date"
+    type: date
+    required: true
+    word_placeholder: "{{ document_date }}"
+    format:
+      display: "%d.%m.%Y"
+
+  document_type:
+    ui_label: "Тип документа"
+    ui_label_en: "Document Type"
+    type: string
+    required: true
+    db_column: "document_type"
+    db_table: "documents"
+    allowed_values:
+      - awb
+      - invoice
+      - upd
+      - invoice_tax
+      - act
+      - waybill
+      - registry_1c
+
+  # ==========================================
+  # COMPUTED / DERIVED FIELDS
+  # ==========================================
+
+  current_date:
+    ui_label: "Текущая дата"
+    ui_label_en: "Current Date"
+    type: date
+    computed: true
+    word_placeholder: "{{ current_date }}"
+    format:
+      display: "%d.%m.%Y"
+
+  current_year:
+    ui_label: "Текущий год"
+    ui_label_en: "Current Year"
+    type: integer
+    computed: true
+    word_placeholder: "{{ current_year }}"
+
+# ==========================================
+# CLIENT TYPE DEFINITIONS
+# ==========================================
+client_types:
+  TiA:
+    name: "Транспортно-экспедиционная компания"
+    name_en: "Transport & Agency"
+    documents:
+      - invoice
+      - upd
+      - invoice_tax
+      - act
+      - awb
+  FF:
+    name: "Freight Forwarder"
+    name_en: "Freight Forwarder"
+    documents:
+      - invoice
+      - upd
+      - invoice_tax
+      - act
+      - awb
+      - additional_agreement
+  IP:
+    name: "Индивидуальный предприниматель"
+    name_en: "Individual Entrepreneur"
+    documents:
+      - invoice
+      - act
+      - awb
+
+# ==========================================
+# STATUS DEFINITIONS
+# ==========================================
+statuses:
+  shipment:
+    draft:
+      label: "Черновик"
+      label_en: "Draft"
+      color: "#FFA500"
+    ready:
+      label: "Готов"
+      label_en: "Ready"
+      color: "#00FF00"
+    sent:
+      label: "Отправлен"
+      label_en: "Sent"
+      color: "#0000FF"
+    archived:
+      label: "Архив"
+      label_en: "Archived"
+      color: "#808080"
+
+  document:
+    generated:
+      label: "Сформирован"
+      label_en: "Generated"
+      color: "#00FF00"
+    sent:
+      label: "Отправлен"
+      label_en: "Sent"
+      color: "#0000FF"
+    archived:
+      label: "Архив"
+      label_en: "Archived"
+      color: "#808080"
