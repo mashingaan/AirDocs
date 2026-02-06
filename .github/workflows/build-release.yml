@@ -12,6 +12,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -30,6 +32,29 @@ jobs:
           VERSION=${GITHUB_REF#refs/tags/v}
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
           echo "Building version: $VERSION"
+
+      - name: Verify tag version matches core/version.py
+        shell: bash
+        run: |
+          cd airdocs
+          TAG_VERSION="${{ steps.get_version.outputs.VERSION }}"
+          PY_VERSION=$(python - <<'PY'
+import pathlib
+import re
+
+text = pathlib.Path("core/version.py").read_text(encoding="utf-8")
+match = re.search(r'^VERSION\\s*=\\s*["\\\']([^"\\\']+)["\\\']', text, re.M)
+if not match:
+    raise SystemExit("VERSION not found in core/version.py")
+print(match.group(1))
+PY
+          )
+          echo "Tag version: $TAG_VERSION"
+          echo "Code version: $PY_VERSION"
+          if [ "$PY_VERSION" != "$TAG_VERSION" ]; then
+            echo "Version mismatch: tag $TAG_VERSION vs core/version.py $PY_VERSION"
+            exit 1
+          fi
       
       - name: Build with PyInstaller
         run: |
@@ -41,14 +66,26 @@ jobs:
         run: |
           cd airdocs
           Compress-Archive -Path "dist\AirDocs\*" -DestinationPath "dist\AirDocs_${{ steps.get_version.outputs.VERSION }}.zip"
-      
-      - name: Generate changelog
-        id: changelog
-        uses: mikepenz/release-changelog-builder-action@v4
-        with:
-          configuration: ".github/changelog-config.json"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract release notes from CHANGELOG
+        id: release_notes
+        shell: bash
+        run: |
+          VERSION="${{ steps.get_version.outputs.VERSION }}"
+          CHANGELOG_FILE="airdocs/CHANGELOG.md"
+          
+          # Извлечь секцию для текущей версии
+          NOTES=$(awk "/## \[$VERSION\]/,/## \[/" "$CHANGELOG_FILE" | sed '1d;$d' | sed '/^$/d')
+          
+          # Fallback если пусто
+          if [ -z "$NOTES" ]; then
+            NOTES="См. полный список изменений в CHANGELOG.md"
+          fi
+          
+          # Сохранить в output (экранировать для multiline)
+          echo "notes<<EOF" >> $GITHUB_OUTPUT
+          echo "$NOTES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
       
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
@@ -56,7 +93,11 @@ jobs:
           files: |
             airdocs/dist/AirDocs_${{ steps.get_version.outputs.VERSION }}.zip
             airdocs/dist/AirDocs/AirDocs_${{ steps.get_version.outputs.VERSION }}.exe
-          body: ${{ steps.changelog.outputs.changelog }}
+          body: |
+            ${{ steps.release_notes.outputs.notes }}
+            
+            ---
+            **Полный список изменений:** [CHANGELOG.md](https://github.com/mashingaan/AirDocs/blob/main/airdocs/CHANGELOG.md)
           draft: false
           prerelease: false
         env:
