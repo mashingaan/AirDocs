@@ -75,7 +75,11 @@ PY
           CHANGELOG_FILE="airdocs/CHANGELOG.md"
           
           # Извлечь секцию для текущей версии
-          NOTES=$(awk "/## \[$VERSION\]/,/## \[/" "$CHANGELOG_FILE" | sed '1d;$d' | sed '/^$/d')
+          NOTES=$(awk -v ver="$VERSION" '
+            index($0, "## [" ver "]") == 1 { found = 1; next }
+            found && index($0, "## [") == 1 { exit }
+            found { print }
+          ' "$CHANGELOG_FILE" | sed '/^$/d')
           
           # Fallback если пусто
           if [ -z "$NOTES" ]; then
