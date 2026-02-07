@@ -301,7 +301,7 @@ class AppContext:
         )
 
     def _ensure_directories(self) -> None:
-        """Ensure all required directories exist."""
+        """Ensure all required directories exist (defensive - should already be created by main.py)."""
         directories = [
             self.get_path("data_dir"),
             self.get_path("output_dir"),

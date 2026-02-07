@@ -52,6 +52,12 @@ if errorlevel 1 (
     exit /b 1
 )
 
+REM === 4.1. Копирование config рядом с EXE (runtime ожидает app_dir\config\settings.yaml) ===
+echo.
+echo Copying config...
+if not exist "dist\\AirDocs\\config" mkdir "dist\\AirDocs\\config"
+xcopy "config" "dist\\AirDocs\\config\\" /E /I /Y >nul
+
 REM === 5. Создание ZIP-архива ===
 echo.
 echo Creating release archive...

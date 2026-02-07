@@ -46,6 +46,31 @@ if str(APP_DIR) not in sys.path:
     sys.path.insert(0, str(APP_DIR))
 
 
+def ensure_data_dirs() -> Path:
+    """
+    Ensure all required data subdirectories exist.
+
+    Creates the full data/ directory structure before logging or AppContext init.
+    Works in both development and PyInstaller frozen modes.
+
+    Returns:
+        Path to the data directory
+    """
+    base = Path(sys.executable).parent if getattr(sys, "frozen", False) else (APP_DIR or Path.cwd())
+    data_dir = base / "data"
+
+    try:
+        data_dir.mkdir(parents=True, exist_ok=True)
+        (data_dir / "logs").mkdir(parents=True, exist_ok=True)
+        (data_dir / "output").mkdir(parents=True, exist_ok=True)
+        (data_dir / "backups").mkdir(parents=True, exist_ok=True)
+        (data_dir / "templates").mkdir(parents=True, exist_ok=True)
+    except Exception as e:
+        print(f"Failed to create data directories: {e}", file=sys.stderr)
+
+    return data_dir
+
+
 def check_directory_access(path: Path) -> tuple[bool, str | None]:
     """Check read/write access for directory."""
     if not path.exists() or not path.is_dir():
@@ -187,7 +212,27 @@ def setup_logging(debug: bool = False) -> logging.Logger:
     from logging.config import dictConfig
     import yaml
 
-    config_path = APP_DIR / "config" / "logging.yaml"
+    # Create logs directory before loading logging config
+    data_dir = ensure_data_dirs()
+    log_dir = data_dir / "logs"
+    try:
+        from core.app_context import get_context
+
+        context = get_context()
+        if getattr(context, "_base_path", None) is not None and hasattr(context, "_user_dir"):
+            log_dir = context.get_path("logs_dir")
+    except Exception:
+        log_dir = data_dir / "logs"
+
+    log_dir.mkdir(parents=True, exist_ok=True)
+
+    # Determine config path based on frozen state
+    if getattr(sys, "frozen", False):
+        # PyInstaller frozen mode: bundled files in sys._MEIPASS
+        config_path = Path(sys._MEIPASS) / "config" / "logging.yaml"
+    else:
+        # Development mode: use APP_DIR
+        config_path = APP_DIR / "config" / "logging.yaml"
 
     if config_path.exists():
         with open(config_path, "r", encoding="utf-8") as f:
@@ -199,13 +244,11 @@ def setup_logging(debug: bool = False) -> logging.Logger:
             for handler in config.get("handlers", {}).values():
                 handler["level"] = "DEBUG"
 
-        # Ensure log directory exists
-        log_dir = APP_DIR / "data" / "logs"
-        log_dir.mkdir(parents=True, exist_ok=True)
-
-        # Update file handler path
-        if "file" in config.get("handlers", {}):
-            config["handlers"]["file"]["filename"] = str(log_dir / "app.log")
+        # Update all file handler paths
+        for handler_name, handler_config in config.get("handlers", {}).items():
+            if "filename" in handler_config:
+                filename = Path(handler_config["filename"]).name
+                handler_config["filename"] = str(log_dir / filename)
 
         dictConfig(config)
     else:
@@ -230,12 +273,13 @@ def init_application() -> bool:
     try:
         # Initialize singleton context (loads config, field mapping, logging)
         context = AppContext()
-        context.initialize(base_path=APP_DIR)
+        base_path = Path(sys.executable).parent if getattr(sys, "frozen", False) else APP_DIR
+        context.initialize(base_path=base_path)
         log_system_diagnostics(logger, context)
 
         # Initialize database with migrations
         db_path = context.get_path("database")
-        migrations_path = context.app_dir / "data" / "migrations"
+        migrations_path = APP_DIR / "data" / "migrations"
 
         logger.info(f"Migrations path: {migrations_path}")
         logger.info(f"Migrations exist: {migrations_path.exists()}")
@@ -1220,6 +1264,9 @@ def main():
     )
 
     args = parser.parse_args()
+
+    # Ensure data directories exist before logging setup
+    ensure_data_dirs()
 
     # Setup logging
     logger = setup_logging(debug=args.debug)
