@@ -726,6 +726,11 @@ def handle_first_run() -> bool:
     except Exception as e:
         logger.warning(f"Failed to record first run info: {e}")
 
+    # Ensure demo templates exist
+    templates_ready = ensure_demo_templates()
+    if not templates_ready:
+        logger.warning("Failed to ensure demo templates during first run")
+
     # Create migration marker
     try:
         context.user_dir.mkdir(parents=True, exist_ok=True)
@@ -735,6 +740,79 @@ def handle_first_run() -> bool:
         logger.warning(f"Failed to create migration marker: {e}")
 
     return True
+
+
+def ensure_demo_templates() -> bool:
+    """
+    Ensure demo templates exist in data/templates/.
+
+    Creates templates if missing using logic from scripts/create_demo_templates.py.
+
+    Returns:
+        True if templates exist or were created successfully
+    """
+    from core.app_context import get_context
+    from pathlib import Path
+
+    logger = logging.getLogger("airdocs")
+    context = get_context()
+
+    # Define expected template paths in data/templates/
+    templates_base = context.user_dir / "templates"
+
+    expected_templates = {
+        "word/invoice.docx": templates_base / "word" / "invoice.docx",
+        "word/upd.docx": templates_base / "word" / "upd.docx",
+        "word/act.docx": templates_base / "word" / "act.docx",
+        "excel/registry_1c.xlsx": templates_base / "excel" / "registry_1c.xlsx",
+        "pdf/awb_blank.pdf": templates_base / "pdf" / "awb_blank.pdf",
+    }
+
+    # Check if any templates are missing
+    missing = [name for name, path in expected_templates.items() if not path.exists()]
+
+    if not missing:
+        logger.info("All demo templates already exist in data/templates/")
+        return True
+
+    logger.info(f"Creating {len(missing)} missing templates: {', '.join(missing)}")
+
+    try:
+        # Import template creation functions
+        from scripts.create_demo_templates import (
+            create_word_invoice_template,
+            create_word_upd_template,
+            create_word_act_template,
+            create_excel_registry_template,
+            create_pdf_awb_blank,
+        )
+
+        # Create missing templates
+        if not expected_templates["word/invoice.docx"].exists():
+            create_word_invoice_template(expected_templates["word/invoice.docx"])
+
+        if not expected_templates["word/upd.docx"].exists():
+            create_word_upd_template(expected_templates["word/upd.docx"])
+
+        if not expected_templates["word/act.docx"].exists():
+            create_word_act_template(expected_templates["word/act.docx"])
+
+        if not expected_templates["excel/registry_1c.xlsx"].exists():
+            create_excel_registry_template(expected_templates["excel/registry_1c.xlsx"])
+
+        if not expected_templates["pdf/awb_blank.pdf"].exists():
+            create_pdf_awb_blank(expected_templates["pdf/awb_blank.pdf"])
+
+        logger.info("Шаблоны созданы автоматически")
+        logger.info("Demo templates created successfully in data/templates/")
+        return True
+
+    except ImportError as e:
+        logger.error(f"Failed to import template creation functions: {e}", exc_info=True)
+        return False
+    except Exception as e:
+        logger.error(f"Failed to create demo templates: {e}", exc_info=True)
+        return False
 
 
 def _get_updater_logger(user_dir: Path) -> logging.Logger:

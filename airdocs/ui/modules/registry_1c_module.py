@@ -2,6 +2,9 @@
 # ====================================
 
 import logging
+import os
+import platform
+import subprocess
 from datetime import date, timedelta
 
 from PySide6.QtWidgets import (
@@ -16,7 +19,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QGroupBox,
     QDateEdit,
-    QCheckBox,
+    QComboBox,
     QMessageBox,
     QProgressDialog,
     QFileDialog,
@@ -95,15 +98,27 @@ class Registry1CModule(QWidget):
         # Filter options
         filter_layout = QHBoxLayout()
 
-        self.chk_air_only = QCheckBox("Только авиа")
-        self.chk_air_only.setChecked(True)
-        self.chk_air_only.stateChanged.connect(self.refresh)
-        filter_layout.addWidget(self.chk_air_only)
+        # Shipment type filter
+        filter_layout.addWidget(QLabel("Тип:"))
+        self.combo_shipment_type = QComboBox()
+        self.combo_shipment_type.addItem("Все", None)
+        self.combo_shipment_type.addItem("Авиаперевозка", ShipmentType.AIR)
+        self.combo_shipment_type.addItem("Местная доставка", ShipmentType.LOCAL_DELIVERY)
+        self.combo_shipment_type.setCurrentIndex(0)
+        self.combo_shipment_type.currentIndexChanged.connect(self.refresh)
+        filter_layout.addWidget(self.combo_shipment_type)
 
-        self.chk_ready_only = QCheckBox("Только готовые")
-        self.chk_ready_only.setChecked(False)
-        self.chk_ready_only.stateChanged.connect(self.refresh)
-        filter_layout.addWidget(self.chk_ready_only)
+        # Status filter
+        filter_layout.addWidget(QLabel("Статус:"))
+        self.combo_status = QComboBox()
+        self.combo_status.addItem("Все", None)
+        self.combo_status.addItem("Черновик", ShipmentStatus.DRAFT)
+        self.combo_status.addItem("Готов", ShipmentStatus.READY)
+        self.combo_status.addItem("Отправлен", ShipmentStatus.SENT)
+        self.combo_status.addItem("Архив", ShipmentStatus.ARCHIVED)
+        self.combo_status.setCurrentIndex(0)
+        self.combo_status.currentIndexChanged.connect(self.refresh)
+        filter_layout.addWidget(self.combo_status)
 
         filter_layout.addStretch()
 
@@ -178,8 +193,8 @@ class Registry1CModule(QWidget):
         date_from = self.date_from.date().toPython()
         date_to = self.date_to.date().toPython()
 
-        shipment_type = ShipmentType.AIR if self.chk_air_only.isChecked() else None
-        status = ShipmentStatus.READY if self.chk_ready_only.isChecked() else None
+        shipment_type = self.combo_shipment_type.currentData(Qt.UserRole)  # None если "Все"
+        status = self.combo_status.currentData(Qt.UserRole)  # None если "Все"
 
         try:
             shipments = self._shipment_repo.get_by_period(
@@ -354,8 +369,22 @@ class Registry1CModule(QWidget):
 
             QMessageBox.information(
                 self, "Успех",
-                f"Реестр экспортирован:\n{file_path}"
+                f"Реестр экспортирован и открыт:\n{file_path}\n\n"
+                f"Записей: {len(shipment_ids)}"
             )
+
+            # Открыть файл в Excel
+            try:
+                if platform.system() == 'Windows':
+                    os.startfile(file_path)
+                elif platform.system() == 'Darwin':  # macOS
+                    subprocess.run(['open', file_path])
+                else:  # Linux
+                    subprocess.run(['xdg-open', file_path])
+                logger.info(f"Opened Excel file: {file_path}")
+            except Exception as e:
+                logger.warning(f"Could not auto-open Excel: {e}")
+                # Не показывать ошибку пользователю, файл уже сохранен
 
         except Exception as e:
             logger.error(f"Failed to export registry: {e}")

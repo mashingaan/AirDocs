@@ -11,6 +11,7 @@ from .file_utils import (
 from .path_builder import PathBuilder
 from .field_mapper import FieldMapper
 from .zip_utils import create_zip_archive, extract_zip
+from .pdf_printer import PDFPrinter
 
 # Lazy imports for modules with external dependencies
 def get_updater():
@@ -47,6 +48,8 @@ __all__ = [
     # Zip utils
     "create_zip_archive",
     "extract_zip",
+    # PDF printer
+    "PDFPrinter",
     # Lazy imports
     "get_updater",
     "get_data_migrator",

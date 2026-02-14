@@ -116,3 +116,25 @@ updater:
   channel: "latest"  # "latest" or "stable"
   check_on_startup: true
   check_timeout: 30  # seconds
+
+# Printer settings
+printer:
+  # Default printer mode: "a4" or "label"
+  default_mode: "a4"
+  # A4 printer settings
+  a4:
+    page_size: "A4"  # QPrinter.A4
+    orientation: "landscape"  # "portrait" or "landscape"
+    margins: [10, 10, 10, 10]  # left, top, right, bottom (mm)
+  # Label printer settings
+  label:
+    page_size: "custom"
+    width_mm: 100
+    height_mm: 150
+    orientation: "portrait"
+    margins: [5, 5, 5, 5]
+  # Print options
+  options:
+    color_mode: "grayscale"  # "color" or "grayscale"
+    resolution: 300  # DPI
+    duplex: false

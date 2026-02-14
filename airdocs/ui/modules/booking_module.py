@@ -26,6 +26,8 @@ from business.shipment_service import ShipmentService
 from business.document_service import DocumentService
 from data.models import Shipment
 from ui.widgets.shipment_form import ShipmentForm
+from utils.pdf_printer import PDFPrinter
+from pathlib import Path
 
 logger = logging.getLogger("airdocs.ui")
 
@@ -47,6 +49,7 @@ class BookingModule(QWidget):
         self._shipment_service = ShipmentService()
         self._document_service = DocumentService()
         self._current_shipment: Shipment | None = None
+        self._pdf_printer = PDFPrinter()
 
         self._init_ui()
         self._load_shipments()
@@ -116,9 +119,17 @@ class BookingModule(QWidget):
         self.btn_generate_awb.clicked.connect(self._on_generate_awb)
         buttons_layout.addWidget(self.btn_generate_awb)
 
+        self.btn_print_awb = QPushButton("Печать AWB")
+        self.btn_print_awb.clicked.connect(self._on_print_awb)
+        buttons_layout.addWidget(self.btn_print_awb)
+
         self.btn_generate_set = QPushButton("Сформировать комплект")
         self.btn_generate_set.clicked.connect(self._on_generate_set)
         buttons_layout.addWidget(self.btn_generate_set)
+
+        self.btn_print_set = QPushButton("Печать комплекта")
+        self.btn_print_set.clicked.connect(self._on_print_set)
+        buttons_layout.addWidget(self.btn_print_set)
 
         self.btn_delete = QPushButton("Удалить")
         self.btn_delete.clicked.connect(self._on_delete)
@@ -384,3 +395,139 @@ class BookingModule(QWidget):
                 QMessageBox.information(self, "Успех", "Отправление удалено")
             except Exception as e:
                 QMessageBox.critical(self, "Ошибка", f"Не удалось удалить: {e}")
+
+    def _get_printer_mode(self) -> str:
+        """Get printer mode from config."""
+        from core.app_context import get_context
+        context = get_context()
+        printer_config = context.config.get("printer", {})
+        return printer_config.get("default_mode", "a4")
+
+    def _on_print_awb(self):
+        """Handle print AWB button click."""
+        if not self._current_shipment:
+            QMessageBox.warning(self, "Предупреждение", "Сначала выберите отправление")
+            return
+
+        try:
+            # Get AWB documents for current shipment
+            awb_docs = self._document_service.get_documents_for_shipment(
+                self._current_shipment.id,
+                DocumentType.AWB
+            )
+
+            if not awb_docs:
+                QMessageBox.warning(
+                    self, "Предупреждение",
+                    "AWB не сформирован. Сначала нажмите 'Сформировать AWB'"
+                )
+                return
+
+            # Get latest version
+            latest_doc = max(awb_docs, key=lambda d: d.version)
+            pdf_path = Path(latest_doc.file_path)
+
+            if not pdf_path.exists():
+                QMessageBox.critical(
+                    self, "Ошибка",
+                    f"Файл AWB не найден: {pdf_path}"
+                )
+                return
+
+            # Get template info for AWB
+            from generators.awb_pdf_generator import AWBPDFGenerator
+            awb_generator = AWBPDFGenerator()
+            template_info = awb_generator.get_template_info()
+            
+            # Log template info for debugging
+            logger.info(f"AWB template info: {template_info}")
+            
+            # Get printer mode from config
+            printer_mode = self._get_printer_mode()
+
+            # Show print preview
+            success = self._pdf_printer.print_with_preview(
+                pdf_path,
+                parent=self,
+                printer_mode=printer_mode,
+                template_info=template_info
+            )
+
+            if success:
+                logger.info(f"Printed AWB: {pdf_path}")
+            else:
+                logger.debug("Print cancelled by user")
+
+        except Exception as e:
+            logger.error(f"Print AWB failed: {e}", exc_info=True)
+            QMessageBox.critical(self, "Ошибка", f"Не удалось напечатать AWB: {e}")
+
+    def _on_print_set(self):
+        """Handle print document set button click."""
+        if not self._current_shipment:
+            QMessageBox.warning(self, "Предупреждение", "Сначала выберите отправление")
+            return
+
+        try:
+            # Get all documents for current shipment
+            all_docs = self._document_service.get_documents_for_shipment(
+                self._current_shipment.id
+            )
+
+            if not all_docs:
+                QMessageBox.warning(
+                    self, "Предупреждение",
+                    "Документы не сформированы. Сначала нажмите 'Сформировать комплект'"
+                )
+                return
+
+            # Filter PDF documents only
+            pdf_docs = [
+                doc for doc in all_docs
+                if Path(doc.file_path).suffix.lower() == '.pdf'
+            ]
+
+            if not pdf_docs:
+                QMessageBox.warning(
+                    self, "Предупреждение",
+                    "PDF документы не найдены. Убедитесь, что комплект сформирован с конвертацией в PDF"
+                )
+                return
+
+            # Get file paths
+            pdf_paths = [Path(doc.file_path) for doc in pdf_docs]
+
+            # Check all files exist
+            missing = [p for p in pdf_paths if not p.exists()]
+            if missing:
+                QMessageBox.critical(
+                    self, "Ошибка",
+                    f"Не найдены файлы:\n" + "\n".join(str(p) for p in missing)
+                )
+                return
+
+            # Get printer mode
+            printer_mode = self._get_printer_mode()
+
+            # Get template info for AWB if available
+            from generators.awb_pdf_generator import AWBPDFGenerator
+            awb_generator = AWBPDFGenerator()
+            template_info = awb_generator.get_template_info()
+            logger.info(f"Document set template info: {template_info}")
+
+            # Print all PDFs
+            success = self._pdf_printer.print_multiple(
+                pdf_paths,
+                parent=self,
+                printer_mode=printer_mode,
+                template_info=template_info
+            )
+
+            if success:
+                logger.info(f"Printed document set: {len(pdf_paths)} files")
+            else:
+                logger.debug("Print cancelled by user")
+
+        except Exception as e:
+            logger.error(f"Print set failed: {e}", exc_info=True)
+            QMessageBox.critical(self, "Ошибка", f"Не удалось напечатать комплект: {e}")

@@ -8,10 +8,12 @@ PySide6>=6.6.0
 # SQLite is built-in, no external package needed
 
 # Document Generation
+python-docx>=1.1.0      # Word document creation for demo templates
 docxtpl>=0.16.0          # Word template filling (Jinja2-based)
 openpyxl>=3.1.0          # Excel generation/manipulation
 pypdf>=3.17.0            # PDF reading, merging, AcroForm detection
 reportlab>=4.0.0         # PDF overlay generation
+PyMuPDF>=1.23.0          # PDF rendering and rasterization
 
 # Office COM Automation (Windows only)
 pywin32>=306             # win32com for Word/Excel/Outlook COM

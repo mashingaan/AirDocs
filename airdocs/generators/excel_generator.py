@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from openpyxl import load_workbook, Workbook
+from openpyxl.styles import Font
 from openpyxl.worksheet.worksheet import Worksheet
 
 from core.exceptions import GenerationError, TemplateError
@@ -175,6 +176,33 @@ class ExcelGenerator(BaseGenerator):
                 for col_idx, (field, _) in enumerate(columns, start=1):
                     value = record.get(field, "")
                     ws.cell(row=row_idx, column=col_idx, value=value)
+
+            # Add summary row
+            if data:
+                total_weight = sum(float(r.get('weight_kg', 0) or 0) for r in data)
+                total_pieces = sum(int(r.get('pieces', 0) or 0) for r in data)
+                total_amount = sum(float(r.get('total_amount', 0) or 0) for r in data)
+                row_count = len(data)
+
+                summary_row = len(data) + 2
+                ws.cell(row=summary_row, column=1, value="ИТОГО").font = Font(bold=True)
+
+                # Write record count to second column
+                ws.cell(row=summary_row, column=2, value=row_count).font = Font(bold=True)
+
+                # Find indices of weight_kg, pieces, total_amount columns
+                for col_idx, (field, _) in enumerate(columns, start=1):
+                    if field == 'weight_kg':
+                        cell = ws.cell(row=summary_row, column=col_idx, value=total_weight)
+                        cell.font = Font(bold=True)
+                        cell.number_format = '0.00'
+                    elif field == 'pieces':
+                        cell = ws.cell(row=summary_row, column=col_idx, value=total_pieces)
+                        cell.font = Font(bold=True)
+                    elif field == 'total_amount':
+                        cell = ws.cell(row=summary_row, column=col_idx, value=total_amount)
+                        cell.font = Font(bold=True)
+                        cell.number_format = '0.00'
 
             # Auto-adjust column widths (basic)
             for col_idx, (field, header) in enumerate(columns, start=1):
