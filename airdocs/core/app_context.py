@@ -6,6 +6,7 @@ import logging.config
 import platform
 import sys
 import subprocess
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -53,16 +54,15 @@ class AppContext:
         Initialize the application context.
 
         Args:
-            base_path: Base path of the application. If None, uses the directory
-                      containing the main script.
+            base_path: Deprecated. Base path is auto-detected.
         """
-        # Determine base path
-        if base_path is None:
-            # Try to find the base path relative to this file
-            # Go up from core/ to awb_dispatcher/
-            self._base_path = Path(__file__).parent.parent.resolve()
+        # Determine writable base path used for data/ in portable mode.
+        if getattr(sys, 'frozen', False):
+            # PyInstaller: directory containing EXE.
+            self._base_path = Path(sys.executable).parent.resolve()
         else:
-            self._base_path = Path(base_path).resolve()
+            # Development: source directory.
+            self._base_path = Path(__file__).parent.parent.resolve()
 
         # Startup diagnostics for frozen/dev environment troubleshooting.
         logging.info(f"Python executable: {sys.executable}")
@@ -81,7 +81,8 @@ class AppContext:
         logging.info(
             f"Platform: {platform.system()} {platform.release()} ({platform.version()})"
         )
-        logging.info(f"Base path: {self._base_path}")
+        logging.info(f"Base path (writable): {self._base_path}")
+        logging.info(f"Resources directory (bundled): {self.resources_dir}")
 
         # Determine user data directory (portable mode only)
         self._user_dir = self._base_path / "data"
@@ -115,6 +116,9 @@ class AppContext:
                 )
             raise
 
+        # Copy bundled configs to user_dir for customization
+        self._copy_bundled_configs_to_user_dir()
+
         # Load configurations
         self._load_config()
         self._load_field_mapping()
@@ -128,15 +132,15 @@ class AppContext:
     @property
     def app_dir(self) -> Path:
         """
-        Directory where application is installed.
+        Directory containing bundled application resources.
 
-        For PyInstaller bundles, this is the directory of the executable.
+        For PyInstaller bundles, this resolves to sys._MEIPASS.
         For development, this is the awb_dispatcher source directory.
+
+        Use this for loading bundled files (config/, templates/, migrations/).
+        For writable storage, use user_dir (base_path/data).
         """
-        if getattr(sys, 'frozen', False):
-            # PyInstaller bundle
-            return Path(sys.executable).parent
-        return self._base_path
+        return self.resources_dir
 
     @property
     def user_dir(self) -> Path:
@@ -147,38 +151,77 @@ class AppContext:
         """
         return self._user_dir
 
+    @property
+    def resources_dir(self) -> Path:
+        """
+        Directory containing read-only bundled resources (config, templates, migrations).
+
+        For PyInstaller bundles: sys._MEIPASS (temporary extraction directory).
+        For development: awb_dispatcher source directory.
+
+        Use this for loading config files, templates, and migrations.
+        Use app_dir for writable application directory (EXE location).
+        """
+        if getattr(sys, 'frozen', False):
+            # PyInstaller: bundled resources in temp dir.
+            return Path(sys._MEIPASS)
+        # Development: source directory.
+        return self._base_path
+
     def _load_config(self) -> None:
-        """Load main configuration from settings.yaml with optional override."""
-        # Load base config from app_dir
-        config_path = self.app_dir / "config" / "settings.yaml"
+        """Load main configuration from bundled settings with user overlay."""
+        user_config_path = self.user_dir / "config" / "settings.yaml"
+        bundled_config_path = self.resources_dir / "config" / "settings.yaml"
 
-        if not config_path.exists():
+        if not bundled_config_path.exists() and not user_config_path.exists():
             raise ConfigurationError(
-                f"Configuration file not found: {config_path}",
-                config_file=str(config_path),
+                "Configuration file not found in bundled or user config paths",
+                config_file=str(bundled_config_path),
             )
 
-        try:
-            with open(config_path, "r", encoding="utf-8") as f:
-                self._config = yaml.safe_load(f) or {}
-        except yaml.YAMLError as e:
-            raise ConfigurationError(
-                f"Error parsing configuration file: {e}",
-                config_file=str(config_path),
-            )
+        bundled_config: dict[str, Any] = {}
+        user_config: dict[str, Any] = {}
 
-        # Check for override config in user_dir
-        override_path = self._user_dir / "config_override.yaml"
+        if bundled_config_path.exists():
+            try:
+                with open(bundled_config_path, "r", encoding="utf-8") as f:
+                    bundled_config = yaml.safe_load(f) or {}
+                logging.info(f"Loaded bundled config base: {bundled_config_path}")
+            except yaml.YAMLError as e:
+                raise ConfigurationError(
+                    f"Error parsing bundled configuration file: {e}",
+                    config_file=str(bundled_config_path),
+                )
+        else:
+            logging.warning(f"Bundled config not found: {bundled_config_path}")
+
+        if user_config_path.exists():
+            try:
+                with open(user_config_path, "r", encoding="utf-8") as f:
+                    user_config = yaml.safe_load(f) or {}
+                logging.info(f"Loaded user config overlay: {user_config_path}")
+            except yaml.YAMLError as e:
+                raise ConfigurationError(
+                    f"Error parsing user configuration file: {e}",
+                    config_file=str(user_config_path),
+                )
+
+        if bundled_config:
+            self._config = self._deep_merge_with_validation(bundled_config, user_config)
+        else:
+            self._config = user_config
+
+        # Legacy: Check for old config_override.yaml (can be removed in future)
+        override_path = self.user_dir / "config_override.yaml"
         if override_path.exists():
             try:
                 with open(override_path, "r", encoding="utf-8") as f:
                     override_config = yaml.safe_load(f) or {}
 
-                # Deep merge with validation
                 self._config = self._deep_merge_with_validation(
                     self._config, override_config
                 )
-                logging.info(f"Applied config override from {override_path}")
+                logging.info(f"Applied legacy config override from {override_path}")
 
             except yaml.YAMLError as e:
                 self._show_config_error_dialog(str(e), override_path)
@@ -256,36 +299,92 @@ class AppContext:
             )
 
     def _load_field_mapping(self) -> None:
-        """Load field mapping from field_mapping.yaml."""
-        mapping_path = self.app_dir / "config" / "field_mapping.yaml"
+        """Load field mapping from bundled config with user overlay."""
+        user_mapping_path = self.user_dir / "config" / "field_mapping.yaml"
+        bundled_mapping_path = self.resources_dir / "config" / "field_mapping.yaml"
 
-        if not mapping_path.exists():
+        if not bundled_mapping_path.exists() and not user_mapping_path.exists():
             raise ConfigurationError(
-                f"Field mapping file not found: {mapping_path}",
-                config_file=str(mapping_path),
+                "Field mapping file not found in bundled or user config paths",
+                config_file=str(bundled_mapping_path),
             )
 
-        try:
-            with open(mapping_path, "r", encoding="utf-8") as f:
-                self._field_mapping = yaml.safe_load(f) or {}
-        except yaml.YAMLError as e:
-            raise ConfigurationError(
-                f"Error parsing field mapping file: {e}",
-                config_file=str(mapping_path),
+        bundled_mapping: dict[str, Any] = {}
+        user_mapping: dict[str, Any] = {}
+
+        if bundled_mapping_path.exists():
+            try:
+                with open(bundled_mapping_path, "r", encoding="utf-8") as f:
+                    bundled_mapping = yaml.safe_load(f) or {}
+                logging.info(
+                    f"Loaded bundled field mapping base: {bundled_mapping_path}"
+                )
+            except yaml.YAMLError as e:
+                raise ConfigurationError(
+                    f"Error parsing bundled field mapping file: {e}",
+                    config_file=str(bundled_mapping_path),
+                )
+        else:
+            logging.warning(f"Bundled field mapping not found: {bundled_mapping_path}")
+
+        if user_mapping_path.exists():
+            try:
+                with open(user_mapping_path, "r", encoding="utf-8") as f:
+                    user_mapping = yaml.safe_load(f) or {}
+                logging.info(
+                    f"Loaded user field mapping overlay: {user_mapping_path}"
+                )
+            except yaml.YAMLError as e:
+                raise ConfigurationError(
+                    f"Error parsing user field mapping file: {e}",
+                    config_file=str(user_mapping_path),
+                )
+
+        if bundled_mapping:
+            self._field_mapping = self._deep_merge_with_validation(
+                bundled_mapping, user_mapping
             )
+        else:
+            self._field_mapping = user_mapping
 
     def _setup_logging(self) -> None:
-        """Setup logging from logging.yaml or use default config."""
-        logging_path = self.app_dir / "config" / "logging.yaml"
+        """Setup logging from bundled config with user overlay or use default config."""
+        user_logging_path = self.user_dir / "config" / "logging.yaml"
+        bundled_logging_path = self.resources_dir / "config" / "logging.yaml"
 
         # Ensure logs directory exists
         logs_dir = self.get_path("logs_dir")
         logs_dir.mkdir(parents=True, exist_ok=True)
 
-        if logging_path.exists():
+        if bundled_logging_path.exists() or user_logging_path.exists():
             try:
-                with open(logging_path, "r", encoding="utf-8") as f:
-                    log_config = yaml.safe_load(f)
+                bundled_logging_config: dict[str, Any] = {}
+                user_logging_config: dict[str, Any] = {}
+
+                if bundled_logging_path.exists():
+                    with open(bundled_logging_path, "r", encoding="utf-8") as f:
+                        bundled_logging_config = yaml.safe_load(f) or {}
+                    logging.info(
+                        f"Loaded bundled logging config base: {bundled_logging_path}"
+                    )
+                else:
+                    logging.warning(
+                        f"Bundled logging config not found: {bundled_logging_path}"
+                    )
+
+                if user_logging_path.exists():
+                    with open(user_logging_path, "r", encoding="utf-8") as f:
+                        user_logging_config = yaml.safe_load(f) or {}
+                    logging.info(
+                        f"Loaded user logging config overlay: {user_logging_path}"
+                    )
+
+                if bundled_logging_config:
+                    log_config = self._deep_merge_with_validation(
+                        bundled_logging_config, user_logging_config
+                    )
+                else:
+                    log_config = user_logging_config
 
                 # Update file paths to be absolute (in user_dir)
                 if "handlers" in log_config:
@@ -331,6 +430,40 @@ class AppContext:
         ]
         for directory in directories:
             directory.mkdir(parents=True, exist_ok=True)
+
+    def _copy_bundled_configs_to_user_dir(self) -> None:
+        """
+        Copy bundled config files to user_dir/config/ if they don't exist.
+
+        This allows users to customize configs that persist across updates.
+        Bundled configs in resources_dir remain as read-only defaults.
+        """
+        user_config_dir = self.user_dir / "config"
+        user_config_dir.mkdir(parents=True, exist_ok=True)
+
+        config_files = ["settings.yaml", "field_mapping.yaml", "logging.yaml"]
+
+        for config_file in config_files:
+            bundled_path = self.resources_dir / "config" / config_file
+            user_path = user_config_dir / config_file
+
+            # Skip if user already has this config
+            if user_path.exists():
+                logging.debug(f"User config exists: {user_path}")
+                continue
+
+            # Copy from bundle if it exists
+            if bundled_path.exists():
+                try:
+                    shutil.copy2(bundled_path, user_path)
+                    logging.info(f"Copied bundled config to user dir: {config_file}")
+                except Exception as e:
+                    logging.warning(
+                        f"Failed to copy {config_file} to user dir: {e}. "
+                        "Will use bundled version."
+                    )
+            else:
+                logging.warning(f"Bundled config not found: {bundled_path}")
 
     @property
     def config(self) -> dict[str, Any]:
@@ -378,7 +511,7 @@ class AppContext:
         data_keys = {'database', 'logs_dir', 'output_dir', 'data_dir'}
 
         # Determine base directory
-        base = self._user_dir if key in data_keys else self.app_dir
+        base = self._user_dir if key in data_keys else self.resources_dir
 
         # Get path from config or defaults
         paths_config = self._config.get("paths", {})
@@ -437,7 +570,7 @@ class AppContext:
             )
 
         rel_path = type_config[template_name]
-        templates_dir = self.get_path("templates_dir")
+        templates_dir = self.resources_dir / "templates"
         return templates_dir / rel_path
 
     def get_field_config(self, field_key: str) -> dict[str, Any]:
