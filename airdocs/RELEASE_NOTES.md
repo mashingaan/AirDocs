@@ -10,6 +10,8 @@
 3. **Мастер настройки**: добавьте контрагентов (отправителей/получателей)
 4. **Готово!** Создавайте AWB в модуле "Бронирование"
 
+> **Важно:** При первом запуске на чистой Windows может потребоваться установка [Microsoft Visual C++ Redistributable](https://aka.ms/vs/17/release/vc_redist.x64.exe). Приложение покажет инструкцию при необходимости.
+
 ### Обновление существующей установки:
 1. **Закройте** старую версию AirDocs
 2. **Распакуйте** новый ZIP **в ТУ ЖЕ папку** (заменит exe)
@@ -40,6 +42,10 @@
 **При ошибках:**
 - Отправьте `data/logs/app.log` разработчику
 - Создайте Issue: [GitHub Issues](https://github.com/mashingaan/AirDocs/issues)
+
+**Ошибка DLL при запуске:**
+- Установите [VC++ Redistributable x64](https://aka.ms/vs/17/release/vc_redist.x64.exe)
+- См. `README_WIN.txt` в архиве для подробностей
 
 **Документация:**
 - [Полный CHANGELOG](https://github.com/mashingaan/AirDocs/blob/main/airdocs/CHANGELOG.md)

@@ -3,6 +3,7 @@
 
 import logging
 import logging.config
+import platform
 import sys
 import subprocess
 from pathlib import Path
@@ -63,8 +64,28 @@ class AppContext:
         else:
             self._base_path = Path(base_path).resolve()
 
+        # Startup diagnostics for frozen/dev environment troubleshooting.
+        logging.info(f"Python executable: {sys.executable}")
+        logging.info(f"Frozen (PyInstaller): {getattr(sys, 'frozen', False)}")
+
+        if getattr(sys, 'frozen', False):
+            try:
+                meipass = getattr(sys, '_MEIPASS', None)
+                if meipass:
+                    logging.info(f"PyInstaller temp dir (_MEIPASS): {meipass}")
+                else:
+                    logging.debug("PyInstaller _MEIPASS is not available")
+            except Exception as e:
+                logging.debug(f"Could not access _MEIPASS: {e}")
+
+        logging.info(
+            f"Platform: {platform.system()} {platform.release()} ({platform.version()})"
+        )
+        logging.info(f"Base path: {self._base_path}")
+
         # Determine user data directory (portable mode only)
         self._user_dir = self._base_path / "data"
+        logging.info(f"User data directory: {self._user_dir}")
         portable_marker = self._user_dir / ".portable"
 
         try:

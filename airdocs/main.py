@@ -35,8 +35,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from core.version import VERSION, get_version
-
 if TYPE_CHECKING:
     from core.app_context import AppContext
 
@@ -44,6 +42,45 @@ if TYPE_CHECKING:
 APP_DIR = Path(__file__).parent
 if str(APP_DIR) not in sys.path:
     sys.path.insert(0, str(APP_DIR))
+
+
+def check_vcredist_dependencies() -> None:
+    """Check required Visual C++ runtime DLLs before loading heavy dependencies."""
+    if platform.system() != "Windows":
+        return
+
+    try:
+        import ctypes
+
+        required_dlls = ["vcruntime140.dll", "msvcp140.dll"]
+        missing_dlls: list[str] = []
+
+        for dll_name in required_dlls:
+            module_handle = ctypes.windll.kernel32.LoadLibraryW(dll_name)
+            if module_handle:
+                ctypes.windll.kernel32.FreeLibrary(module_handle)
+            else:
+                missing_dlls.append(dll_name)
+
+        if not missing_dlls:
+            return
+
+        message = (
+            "Ошибка запуска AirDocs\n\n"
+            "Отсутствуют необходимые системные библиотеки (Visual C++ Runtime).\n\n"
+            "Решение:\n"
+            "1. Скачайте Microsoft Visual C++ Redistributable x64:\n"
+            "   https://aka.ms/vs/17/release/vc_redist.x64.exe\n"
+            "2. Установите и перезапустите AirDocs.\n\n"
+            "Если проблема сохраняется, отправьте data/logs/app.log разработчику."
+        )
+        ctypes.windll.user32.MessageBoxW(0, message, "AirDocs - Ошибка", 0x10)
+        sys.exit(1)
+    except Exception as e:
+        print(f"Warning: Could not check VC++ dependencies: {e}", file=sys.stderr)
+
+
+from core.version import VERSION, get_version
 
 
 def ensure_data_dirs() -> Path:
@@ -1347,6 +1384,9 @@ def main():
     )
 
     args = parser.parse_args()
+
+    # Validate VC++ runtime before logging setup or any Qt imports.
+    check_vcredist_dependencies()
 
     # Ensure data directories exist before logging setup
     ensure_data_dirs()

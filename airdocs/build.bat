@@ -18,9 +18,11 @@ echo.
 
 REM === 2. Очистка предыдущих сборок ===
 echo Cleaning previous builds...
-if exist "dist\AirDocs" rmdir /s /q "dist\AirDocs"
 if exist "build" rmdir /s /q "build"
+if exist "dist\AirDocs.exe" del /q "dist\AirDocs.exe"
+if exist "dist\AirDocs_%VERSION%.exe" del /q "dist\AirDocs_%VERSION%.exe"
 if exist "dist\AirDocs_v%VERSION%_WIN.zip" del /q "dist\AirDocs_v%VERSION%_WIN.zip"
+if exist "dist\README_WIN.txt" del /q "dist\README_WIN.txt"
 
 REM === 3. Генерация version_info.txt для PyInstaller ===
 echo Generating version metadata...
@@ -52,94 +54,60 @@ if errorlevel 1 (
     exit /b 1
 )
 
-REM === 4.2. Создание структуры data/ для портативного режима ===
+REM === 4.5. Rename EXE to versioned name ===
 echo.
-echo Creating portable data structure...
-if not exist "dist\AirDocs\data" mkdir "dist\AirDocs\data"
-if not exist "dist\AirDocs\data\logs" mkdir "dist\AirDocs\data\logs"
-if not exist "dist\AirDocs\data\output" mkdir "dist\AirDocs\data\output"
-if not exist "dist\AirDocs\data\backups" mkdir "dist\AirDocs\data\backups"
-if not exist "dist\AirDocs\data\templates" mkdir "dist\AirDocs\data\templates"
-echo Data directories created.
+echo Renaming EXE to AirDocs_%VERSION%.exe...
+if not exist "dist\AirDocs.exe" (
+    echo ERROR: dist\AirDocs.exe not found after PyInstaller^!
+    pause
+    exit /b 1
+)
+move "dist\AirDocs.exe" "dist\AirDocs_%VERSION%.exe"
+if errorlevel 1 (
+    echo ERROR: Failed to rename EXE^!
+    pause
+    exit /b 1
+)
+echo EXE renamed successfully.
 
-REM === 4.2.1. Placeholders for empty data folders in ZIP ===
-echo Adding placeholders for empty data folders...
-type nul > "dist\AirDocs\data\logs\.keep"
-type nul > "dist\AirDocs\data\output\.keep"
-type nul > "dist\AirDocs\data\backups\.keep"
-type nul > "dist\AirDocs\data\templates\.keep"
-echo Placeholders created.
-
-REM === 4.3. Создание README_WIN.txt ===
-echo Creating README_WIN.txt...
-(
-echo ========================================
-echo AirDocs v%VERSION% - Инструкция
-echo ========================================
+REM === 4.6. Copy README_WIN.txt to dist ===
 echo.
-echo ЧТО ЭТО:
-echo --------
-echo AirDocs - система управления AWB и документами.
-echo Полностью портативная: все данные в папке data/.
-echo.
-echo ПЕРВЫЙ ЗАПУСК:
-echo --------------
-echo 1. Распакуйте ZIP в любую папку ^(например, C:\AirDocs^)
-echo 2. Дважды кликните AirDocs_%VERSION%.exe
-echo 3. Мастер настройки: добавьте контрагентов
-echo 4. Готово! Создавайте AWB в модуле "Бронирование"
-echo.
-echo ОБНОВЛЕНИЕ:
-echo -----------
-echo - Автоматическое: при запуске проверяется GitHub
-echo - Ручное: распакуйте новый ZIP в ТУ ЖЕ папку
-echo   ^(data/awb_dispatcher.db сохранится!^)
-echo.
-echo ДАННЫЕ:
-echo -------
-echo - База данных: data/awb_dispatcher.db
-echo - Логи: data/logs/app.log
-echo - Выходные файлы: data/output/
-echo - Шаблоны: data/templates/
-echo.
-echo ПОДДЕРЖКА:
-echo ----------
-echo При ошибках отправьте data/logs/app.log
-echo GitHub: https://github.com/mashingaan/AirDocs
-echo.
-echo ========================================
-echo Версия: %VERSION%
-echo Дата: 14.02.2026
-echo ========================================
-) > "dist\AirDocs\README_WIN.txt"
-echo README_WIN.txt created.
-
-REM === 4.1. Копирование config рядом с EXE (runtime ожидает app_dir\config\settings.yaml) ===
-echo.
-echo Copying config...
-if not exist "dist\\AirDocs\\config" mkdir "dist\\AirDocs\\config"
-xcopy "config" "dist\\AirDocs\\config\\" /E /I /Y >nul
+echo Copying README_WIN.txt...
+if not exist "README_WIN.txt" (
+    echo ERROR: README_WIN.txt not found in project root^!
+    pause
+    exit /b 1
+)
+copy /y "README_WIN.txt" "dist\README_WIN.txt" >nul
+if errorlevel 1 (
+    echo ERROR: Failed to copy README_WIN.txt^!
+    pause
+    exit /b 1
+)
+echo README_WIN.txt copied to dist.
 
 REM === 5. Create ZIP archive ===
 echo.
 echo Creating release archive...
-powershell -Command "Compress-Archive -Path 'dist\AirDocs\*' -DestinationPath 'dist\AirDocs_v%VERSION%_WIN.zip' -Force"
-
-REM === 5.0. Cleanup placeholder files after ZIP creation ===
-if exist "dist\AirDocs\data\logs\.keep" del /q "dist\AirDocs\data\logs\.keep"
-if exist "dist\AirDocs\data\output\.keep" del /q "dist\AirDocs\data\output\.keep"
-if exist "dist\AirDocs\data\backups\.keep" del /q "dist\AirDocs\data\backups\.keep"
-if exist "dist\AirDocs\data\templates\.keep" del /q "dist\AirDocs\data\templates\.keep"
-
-REM === 5.1. Создание standalone копии EXE ===
-echo.
-echo Creating standalone EXE copy...
-copy "dist\AirDocs\AirDocs_%VERSION%.exe" "dist\AirDocs_%VERSION%.exe" >nul
-if errorlevel 1 (
-    echo WARNING: Failed to create standalone EXE copy
-) else (
-    echo Standalone EXE: dist\AirDocs_%VERSION%.exe
+if not exist "dist\AirDocs_%VERSION%.exe" (
+    echo ERROR: Versioned EXE not found^!
+    pause
+    exit /b 1
 )
+if not exist "dist\README_WIN.txt" (
+    echo ERROR: dist\README_WIN.txt not found^!
+    pause
+    exit /b 1
+)
+
+powershell -Command "Compress-Archive -Path 'dist\AirDocs_%VERSION%.exe','dist\README_WIN.txt' -DestinationPath 'dist\AirDocs_v%VERSION%_WIN.zip' -Force"
+
+if errorlevel 1 (
+    echo ERROR: ZIP creation failed^!
+    pause
+    exit /b 1
+)
+echo ZIP created: dist\AirDocs_v%VERSION%_WIN.zip
 
 REM === 6. Git tag и push (опционально) ===
 echo.
@@ -195,8 +163,14 @@ echo ========================================
 echo Build Complete^!
 echo ========================================
 echo Version: %VERSION%
-echo Output: dist\AirDocs\
+echo Standalone EXE: dist\AirDocs_%VERSION%.exe
 echo Archive: dist\AirDocs_v%VERSION%_WIN.zip
+echo README: dist\README_WIN.txt
+echo.
+echo ИНСТРУКЦИЯ:
+echo - Отправьте клиенту: dist\AirDocs_v%VERSION%_WIN.zip
+echo - Внутри ZIP: AirDocs_%VERSION%.exe + README_WIN.txt
+echo - Клиент: распаковать ^> запустить EXE ^> data/ создастся
 echo.
 pause
 
