@@ -1299,8 +1299,13 @@ def run_gui(debug: bool = False) -> int:
     QComboBox[hasError="true"],
     QDateEdit[hasError="true"],
     QTextEdit[hasError="true"] {
-        border: 2px solid #e74c3c;
-        background-color: #fadbd8;
+        border: 2px solid #dc3545;
+        border-radius: 3px;
+        background-color: #fff5f5;
+    }
+    QLineEdit[hasError="true"]:hover,
+    QComboBox[hasError="true"]:hover {
+        border: 2px solid #c82333;
     }
     """
     existing_qss = app.styleSheet()

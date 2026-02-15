@@ -462,6 +462,37 @@ class AppContext:
         """Get AWB Editor configuration."""
         return self._config.get("awb_editor", {})
 
+    def save_ui_config(self, ui_settings: dict[str, Any]) -> None:
+        """
+        Save UI settings to config override file.
+
+        Args:
+            ui_settings: Dictionary with UI settings to save (e.g., {'window_width': 1400, 'window_height': 900})
+        """
+        override_path = self._user_dir / "config_override.yaml"
+
+        # Load existing override or create new
+        existing_override = {}
+        if override_path.exists():
+            try:
+                with open(override_path, "r", encoding="utf-8") as f:
+                    existing_override = yaml.safe_load(f) or {}
+            except yaml.YAMLError as e:
+                self._logger.warning(f"Could not load config override: {e}")
+
+        # Merge UI settings
+        if "ui" not in existing_override:
+            existing_override["ui"] = {}
+        existing_override["ui"].update(ui_settings)
+
+        # Save to file
+        try:
+            with open(override_path, "w", encoding="utf-8") as f:
+                yaml.safe_dump(existing_override, f, allow_unicode=True, default_flow_style=False)
+            self._logger.info(f"Saved UI config to {override_path}")
+        except Exception as e:
+            self._logger.error(f"Failed to save UI config: {e}", exc_info=True)
+
 
 # Global convenience function
 def get_context() -> AppContext:

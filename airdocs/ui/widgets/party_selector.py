@@ -49,7 +49,7 @@ class PartySelector(QWidget):
         self.combo = QComboBox()
         self.combo.setEditable(True)
         self.combo.setInsertPolicy(QComboBox.NoInsert)
-        self.combo.setMinimumWidth(200)
+        self.combo.setMinimumWidth(300)
         self.combo.currentIndexChanged.connect(self._on_selection_changed)
         layout.addWidget(self.combo, 1)
 

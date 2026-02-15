@@ -96,6 +96,7 @@ class BookingModule(QWidget):
         self.table.doubleClicked.connect(self._on_double_click)
 
         left_layout.addWidget(self.table)
+        left_panel.setMinimumWidth(300)  # Таблица не уже 300px
 
         splitter.addWidget(left_panel)
 
@@ -136,11 +137,17 @@ class BookingModule(QWidget):
         buttons_layout.addWidget(self.btn_delete)
 
         right_layout.addWidget(buttons_group)
+        right_panel.setMinimumWidth(500)  # Форма не уже 500px
 
         splitter.addWidget(right_panel)
 
-        # Set initial splitter sizes (40% left, 60% right)
-        splitter.setSizes([400, 600])
+        # Set stretch factors for responsive layout (1:2 ratio = ~33%:67%)
+        splitter.setStretchFactor(0, 1)  # Left panel (table)
+        splitter.setStretchFactor(1, 2)  # Right panel (form)
+
+        # Prevent table from collapsing completely
+        splitter.setCollapsible(0, False)
+        splitter.setCollapsible(1, False)
 
     def _load_shipments(self):
         """Load shipments into table."""

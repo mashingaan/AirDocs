@@ -55,11 +55,11 @@ class MainWindow(QMainWindow):
 
         # Get size from config
         ui_config = self._context.config.get("ui", {})
-        width = ui_config.get("window_width", 1200)
-        height = ui_config.get("window_height", 800)
+        width = ui_config.get("window_width", 1400)
+        height = ui_config.get("window_height", 900)
 
         self.resize(width, height)
-        self.setMinimumSize(800, 600)
+        self.setMinimumSize(1000, 700)
 
         # Center on screen
         screen = self.screen().geometry()
@@ -439,6 +439,16 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event):
         """Handle window close."""
-        # Could add confirmation dialog here
+        # Save window size to config
+        try:
+            current_size = self.size()
+            ui_settings = {
+                "window_width": current_size.width(),
+                "window_height": current_size.height()
+            }
+            self._context.save_ui_config(ui_settings)
+        except Exception as e:
+            logger.error(f"Failed to save window size: {e}", exc_info=True)
+
         logger.info("Application closing")
         event.accept()

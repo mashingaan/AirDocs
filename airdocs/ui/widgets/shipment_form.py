@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
     QDateEdit,
     QComboBox,
     QPushButton,
+    QLabel,
 )
 from PySide6.QtCore import Qt, QDate
 
@@ -45,6 +46,7 @@ class ShipmentForm(QWidget):
         super().__init__(parent)
         self._party_repo = PartyRepository()
         self._template_repo = TemplateRepository()
+        self._error_labels = {}  # field_name -> QLabel
         self._init_ui()
 
     def _init_ui(self):
@@ -60,22 +62,40 @@ class ShipmentForm(QWidget):
 
         # === Main data group ===
         main_group = QGroupBox("Основные данные")
+        main_group.setMinimumWidth(450)
         main_layout = QFormLayout(main_group)
+        main_layout.setLabelAlignment(Qt.AlignRight)
+        main_layout.setFormAlignment(Qt.AlignLeft)
 
         self.awb_number = QLineEdit()
         self.awb_number.setPlaceholderText("12345678 или 123-12345678")
         main_layout.addRow("AWB номер:", self.awb_number)
+        error_label = QLabel()
+        error_label.setStyleSheet("color: #dc3545; font-size: 11px; margin-top: 2px;")
+        error_label.hide()
+        main_layout.addRow("", error_label)
+        self._error_labels["awb_number"] = error_label
 
         self.shipment_date = QDateEdit()
         self.shipment_date.setCalendarPopup(True)
         self.shipment_date.setDate(QDate.currentDate())
         self.shipment_date.setDisplayFormat("dd.MM.yyyy")
         main_layout.addRow("Дата:", self.shipment_date)
+        error_label = QLabel()
+        error_label.setStyleSheet("color: #dc3545; font-size: 11px; margin-top: 2px;")
+        error_label.hide()
+        main_layout.addRow("", error_label)
+        self._error_labels["shipment_date"] = error_label
 
         self.shipment_type = QComboBox()
         self.shipment_type.addItem("Авиаперевозка", ShipmentType.AIR)
         self.shipment_type.addItem("Местная доставка", ShipmentType.LOCAL_DELIVERY)
         main_layout.addRow("Тип:", self.shipment_type)
+        error_label = QLabel()
+        error_label.setStyleSheet("color: #dc3545; font-size: 11px; margin-top: 2px;")
+        error_label.hide()
+        main_layout.addRow("", error_label)
+        self._error_labels["shipment_type"] = error_label
 
         # Weight, pieces, volume
         measures_layout = QHBoxLayout()
@@ -84,63 +104,100 @@ class ShipmentForm(QWidget):
         self.weight_kg.setRange(0.001, 999999.999)
         self.weight_kg.setDecimals(3)
         self.weight_kg.setSuffix(" кг")
+        self.weight_kg.setMinimumWidth(80)
         measures_layout.addWidget(self.weight_kg)
 
         self.pieces = QSpinBox()
         self.pieces.setRange(1, 99999)
         self.pieces.setValue(1)
         self.pieces.setSuffix(" мест")
+        self.pieces.setMinimumWidth(70)
         measures_layout.addWidget(self.pieces)
 
         self.volume_m3 = QDoubleSpinBox()
         self.volume_m3.setRange(0, 9999.999)
         self.volume_m3.setDecimals(3)
         self.volume_m3.setSuffix(" м³")
+        self.volume_m3.setMinimumWidth(80)
         measures_layout.addWidget(self.volume_m3)
 
         main_layout.addRow("Вес / Мест / Объем:", measures_layout)
+        error_label = QLabel()
+        error_label.setStyleSheet("color: #dc3545; font-size: 11px; margin-top: 2px;")
+        error_label.hide()
+        main_layout.addRow("", error_label)
+        self._error_labels["measures"] = error_label
 
         self.goods_description = QLineEdit()
         self.goods_description.setPlaceholderText("Описание товара")
         main_layout.addRow("Описание товара:", self.goods_description)
+        error_label = QLabel()
+        error_label.setStyleSheet("color: #dc3545; font-size: 11px; margin-top: 2px;")
+        error_label.hide()
+        main_layout.addRow("", error_label)
+        self._error_labels["goods_description"] = error_label
 
         layout.addWidget(main_group)
 
         # === Shipper group ===
         shipper_group = QGroupBox("Отправитель")
+        shipper_group.setMinimumWidth(450)
         shipper_layout = QVBoxLayout(shipper_group)
 
         self.shipper_selector = PartySelector("shipper")
         shipper_layout.addWidget(self.shipper_selector)
+        error_label = QLabel()
+        error_label.setStyleSheet("color: #dc3545; font-size: 11px; margin-top: 2px;")
+        error_label.hide()
+        shipper_layout.addWidget(error_label)
+        self._error_labels["shipper_id"] = error_label
 
         layout.addWidget(shipper_group)
 
         # === Consignee group ===
         consignee_group = QGroupBox("Получатель")
+        consignee_group.setMinimumWidth(450)
         consignee_layout = QVBoxLayout(consignee_group)
 
         self.consignee_selector = PartySelector("consignee")
         consignee_layout.addWidget(self.consignee_selector)
+        error_label = QLabel()
+        error_label.setStyleSheet("color: #dc3545; font-size: 11px; margin-top: 2px;")
+        error_label.hide()
+        consignee_layout.addWidget(error_label)
+        self._error_labels["consignee_id"] = error_label
 
         layout.addWidget(consignee_group)
 
         # === Agent group ===
         agent_group = QGroupBox("Агент/Перевозчик")
+        agent_group.setMinimumWidth(450)
         agent_layout = QVBoxLayout(agent_group)
 
         self.agent_selector = PartySelector("agent")
         self.agent_selector.set_required(False)
         agent_layout.addWidget(self.agent_selector)
+        error_label = QLabel()
+        error_label.setStyleSheet("color: #dc3545; font-size: 11px; margin-top: 2px;")
+        error_label.hide()
+        agent_layout.addWidget(error_label)
+        self._error_labels["agent_id"] = error_label
 
         layout.addWidget(agent_group)
 
         # === Notes ===
         notes_group = QGroupBox("Примечания")
+        notes_group.setMinimumWidth(450)
         notes_layout = QVBoxLayout(notes_group)
 
         self.notes = QTextEdit()
         self.notes.setMaximumHeight(80)
         notes_layout.addWidget(self.notes)
+        error_label = QLabel()
+        error_label.setStyleSheet("color: #dc3545; font-size: 11px; margin-top: 2px;")
+        error_label.hide()
+        notes_layout.addWidget(error_label)
+        self._error_labels["notes"] = error_label
 
         layout.addWidget(notes_group)
 
@@ -287,10 +344,16 @@ class ShipmentForm(QWidget):
                 "notes": self.notes,
             }
 
+            measures_error_shown = False
             for field_name in result.field_errors.keys():
                 widget = field_widget_map.get(field_name)
                 if widget:
-                    self._apply_error_style(widget)
+                    error_msg = result.field_errors[field_name]
+                    if field_name in {"weight_kg", "pieces", "volume_m3"}:
+                        if measures_error_shown:
+                            continue
+                        measures_error_shown = True
+                    self._apply_error_style(widget, error_msg)
 
     def _init_validation_signals(self):
         """Connect field signals for real-time validation (NO modal dialogs)."""
@@ -365,8 +428,22 @@ class ShipmentForm(QWidget):
         if not widget:
             return
 
+        measures_fields = ("weight_kg", "pieces", "volume_m3")
+        if field_name in measures_fields:
+            first_measures_error_field = next(
+                (name for name in measures_fields if name in result.field_errors),
+                None,
+            )
+            if first_measures_error_field:
+                error_msg = result.field_errors[first_measures_error_field]
+                self._apply_error_style(widget, error_msg)
+            else:
+                self._clear_error_style(widget)
+            return
+
         if field_name in result.field_errors:
-            self._apply_error_style(widget)
+            error_msg = result.field_errors[field_name]
+            self._apply_error_style(widget, error_msg)
         else:
             self._clear_error_style(widget)
 
@@ -378,19 +455,100 @@ class ShipmentForm(QWidget):
         widget.style().polish(widget)
         widget.update()
 
-    def _apply_error_style(self, widget: QWidget):
+    def _apply_error_style(self, widget: QWidget, error_message: str = None):
         """Apply error state to a widget."""
         if isinstance(widget, PartySelector):
             self._set_error_state(widget.combo, True)
+            widget.combo.setToolTip(error_message or "Ошибка валидации")
+
+            field_name = None
+            if widget == self.shipper_selector:
+                field_name = "shipper_id"
+            elif widget == self.consignee_selector:
+                field_name = "consignee_id"
+            elif widget == self.agent_selector:
+                field_name = "agent_id"
+
+            if field_name:
+                self._show_error_label(field_name, error_message)
         else:
             self._set_error_state(widget, True)
+            widget.setToolTip(error_message or "Ошибка валидации")
+
+            field_name = None
+            if widget == self.awb_number:
+                field_name = "awb_number"
+            elif widget == self.shipment_date:
+                field_name = "shipment_date"
+            elif widget == self.shipment_type:
+                field_name = "shipment_type"
+            elif widget == self.weight_kg:
+                field_name = "measures"
+            elif widget == self.pieces:
+                field_name = "measures"
+            elif widget == self.volume_m3:
+                field_name = "measures"
+            elif widget == self.goods_description:
+                field_name = "goods_description"
+            elif widget == self.notes:
+                field_name = "notes"
+
+            if field_name:
+                self._show_error_label(field_name, error_message)
 
     def _clear_error_style(self, widget: QWidget):
         """Clear error state from a widget."""
         if isinstance(widget, PartySelector):
             self._set_error_state(widget.combo, False)
+            widget.combo.setToolTip("")
+
+            field_name = None
+            if widget == self.shipper_selector:
+                field_name = "shipper_id"
+            elif widget == self.consignee_selector:
+                field_name = "consignee_id"
+            elif widget == self.agent_selector:
+                field_name = "agent_id"
+
+            if field_name:
+                self._hide_error_label(field_name)
         else:
             self._set_error_state(widget, False)
+            widget.setToolTip("")
+
+            field_name = None
+            if widget == self.awb_number:
+                field_name = "awb_number"
+            elif widget == self.shipment_date:
+                field_name = "shipment_date"
+            elif widget == self.shipment_type:
+                field_name = "shipment_type"
+            elif widget == self.weight_kg:
+                field_name = "measures"
+            elif widget == self.pieces:
+                field_name = "measures"
+            elif widget == self.volume_m3:
+                field_name = "measures"
+            elif widget == self.goods_description:
+                field_name = "goods_description"
+            elif widget == self.notes:
+                field_name = "notes"
+
+            if field_name:
+                self._hide_error_label(field_name)
+
+    def _show_error_label(self, field_name: str, message: str):
+        """Show error label for a field."""
+        label = self._error_labels.get(field_name)
+        if label:
+            label.setText(message or "Ошибка валидации")
+            label.show()
+
+    def _hide_error_label(self, field_name: str):
+        """Hide error label for a field."""
+        label = self._error_labels.get(field_name)
+        if label:
+            label.hide()
 
     def clear_error_styles(self):
         """Clear error states from all fields."""
@@ -403,11 +561,13 @@ class ShipmentForm(QWidget):
             self.volume_m3,
             self.goods_description,
             self.notes,
+            self.shipper_selector,
+            self.consignee_selector,
+            self.agent_selector,
         ]
         for widget in widgets:
-            self._set_error_state(widget, False)
+            self._clear_error_style(widget)
 
-        # Clear party selector styles
-        self._set_error_state(self.shipper_selector.combo, False)
-        self._set_error_state(self.consignee_selector.combo, False)
-        self._set_error_state(self.agent_selector.combo, False)
+        # Hide all error labels
+        for label in self._error_labels.values():
+            label.hide()

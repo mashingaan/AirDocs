@@ -7,7 +7,10 @@ on:
 
 jobs:
   build-windows:
-    runs-on: windows-latest
+    strategy:
+      matrix:
+        os: [windows-2022, windows-2019]
+    runs-on: ${{ matrix.os }}
     
     steps:
       - name: Checkout code
@@ -33,83 +36,157 @@ jobs:
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
           echo "Building version: $VERSION"
 
-      - name: Verify tag version matches core/version.py
+      - name: Extract code version from core/version.py
+        id: code_version
         shell: bash
         run: |
           cd airdocs
-          TAG_VERSION="${{ steps.get_version.outputs.VERSION }}"
-          PY_VERSION=$(python - <<'PY'
-import pathlib
-import re
+          CODE_VER=$(python -c "import re, pathlib; m = re.search(r'^VERSION\s*=\s*\"([^\"]+)\"', pathlib.Path('core/version.py').read_text(encoding='utf-8'), re.M); print(m.group(1) if m else exit(1))")
+          echo "version=$CODE_VER" >> $GITHUB_OUTPUT
+          echo "Code version from core/version.py: $CODE_VER"
 
-text = pathlib.Path("core/version.py").read_text(encoding="utf-8")
-match = re.search(r'^VERSION\\s*=\\s*["\\\']([^"\\\']+)["\\\']', text, re.M)
-if not match:
-    raise SystemExit("VERSION not found in core/version.py")
-print(match.group(1))
-PY
-          )
-          echo "Tag version: $TAG_VERSION"
-          echo "Code version: $PY_VERSION"
-          if [ "$PY_VERSION" != "$TAG_VERSION" ]; then
-            echo "Version mismatch: tag $TAG_VERSION vs core/version.py $PY_VERSION"
+      - name: Verify tag matches code version
+        shell: bash
+        run: |
+          TAG_VER="${{ steps.get_version.outputs.VERSION }}"
+          CODE_VER="${{ steps.code_version.outputs.version }}"
+          echo "Tag version: $TAG_VER"
+          echo "Code version: $CODE_VER"
+          if [ "$TAG_VER" != "$CODE_VER" ]; then
+            echo "❌ Version mismatch: tag v$TAG_VER != core/version.py $CODE_VER"
             exit 1
           fi
+          echo "✅ Versions match: $TAG_VER"
       
       - name: Build with PyInstaller
         run: |
           cd airdocs
           python scripts/generate_version_info.py
           pyinstaller AirDocs.spec --noconfirm
+
+      - name: Create portable data structure
+        run: |
+          cd airdocs
+          New-Item -ItemType Directory -Force -Path "dist\AirDocs\data\logs"
+          New-Item -ItemType Directory -Force -Path "dist\AirDocs\data\output"
+          New-Item -ItemType Directory -Force -Path "dist\AirDocs\data\backups"
+          New-Item -ItemType Directory -Force -Path "dist\AirDocs\data\templates"
+
+          # Placeholders для пустых папок в ZIP
+          New-Item -ItemType File -Force -Path "dist\AirDocs\data\logs\.keep"
+          New-Item -ItemType File -Force -Path "dist\AirDocs\data\output\.keep"
+          New-Item -ItemType File -Force -Path "dist\AirDocs\data\backups\.keep"
+          New-Item -ItemType File -Force -Path "dist\AirDocs\data\templates\.keep"
+
+      - name: Create README_WIN.txt
+        shell: pwsh
+        run: |
+          cd airdocs
+          $VERSION = "${{ steps.get_version.outputs.VERSION }}"
+          $README = @"
+          ========================================
+          AirDocs v$VERSION - Инструкция
+          ========================================
+
+          ЧТО ЭТО:
+          --------
+          AirDocs - система управления AWB и документами.
+          Полностью портативная: все данные в папке data/.
+
+          ПЕРВЫЙ ЗАПУСК:
+          --------------
+          1. Распакуйте ZIP в любую папку (например, C:\AirDocs)
+          2. Дважды кликните AirDocs_$VERSION.exe
+          3. Мастер настройки: добавьте контрагентов
+          4. Готово! Создавайте AWB в модуле "Бронирование"
+
+          ОБНОВЛЕНИЕ:
+          -----------
+          - Автоматическое: при запуске проверяется GitHub
+          - Ручное: распакуйте новый ZIP в ТУ ЖЕ папку
+            (data/awb_dispatcher.db сохранится!)
+
+          ДАННЫЕ:
+          -------
+          - База данных: data/awb_dispatcher.db
+          - Логи: data/logs/app.log
+          - Выходные файлы: data/output/
+          - Шаблоны: data/templates/
+
+          ПОДДЕРЖКА:
+          ----------
+          При ошибках отправьте data/logs/app.log
+          GitHub: https://github.com/mashingaan/AirDocs
+
+          ========================================
+          Версия: $VERSION
+          Сборка: GitHub Actions
+          ========================================
+          "@
+          Set-Content -Path "dist\AirDocs\README_WIN.txt" -Value $README -Encoding UTF8
       
       - name: Create ZIP archive
         run: |
           cd airdocs
-          Compress-Archive -Path "dist\AirDocs\*" -DestinationPath "dist\AirDocs_${{ steps.get_version.outputs.VERSION }}.zip"
+          Compress-Archive -Path "dist\AirDocs\*" -DestinationPath "dist\AirDocs_v${{ steps.get_version.outputs.VERSION }}_WIN.zip"
 
-      - name: Extract release notes from CHANGELOG
+      - name: Generate release notes from template
         id: release_notes
         shell: bash
         run: |
           VERSION="${{ steps.get_version.outputs.VERSION }}"
+          DATE=$(date +"%d.%m.%Y")
           CHANGELOG_FILE="airdocs/CHANGELOG.md"
+          TEMPLATE_FILE="airdocs/RELEASE_NOTES.md"
           
-          # Извлечь секцию для текущей версии
-          NOTES=$(awk -v ver="$VERSION" '
+          # Извлечь секцию для текущей версии из CHANGELOG
+          CHANGELOG_SECTION=$(awk -v ver="$VERSION" '
             index($0, "## [" ver "]") == 1 { found = 1; next }
             found && index($0, "## [") == 1 { exit }
             found { print }
           ' "$CHANGELOG_FILE" | sed '/^$/d')
           
           # Fallback если пусто
-          if [ -z "$NOTES" ]; then
-            NOTES="См. полный список изменений в CHANGELOG.md"
+          if [ -z "$CHANGELOG_SECTION" ]; then
+            CHANGELOG_SECTION="См. полный список изменений в CHANGELOG.md"
           fi
           
-          # Сохранить в output (экранировать для multiline)
+          # Заполнить шаблон
+          TEMPLATE=$(cat "$TEMPLATE_FILE")
+          NOTES="${TEMPLATE//\{VERSION\}/$VERSION}"
+          NOTES="${NOTES//\{DATE\}/$DATE}"
+          NOTES="${NOTES//\{CHANGELOG_SECTION\}/$CHANGELOG_SECTION}"
+          
+          # Сохранить в output
           echo "notes<<EOF" >> $GITHUB_OUTPUT
           echo "$NOTES" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
-      
+
       - name: Create GitHub Release
+        if: matrix.os == 'windows-2022'
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            airdocs/dist/AirDocs_${{ steps.get_version.outputs.VERSION }}.zip
+            airdocs/dist/AirDocs_v${{ steps.get_version.outputs.VERSION }}_WIN.zip
             airdocs/dist/AirDocs/AirDocs_${{ steps.get_version.outputs.VERSION }}.exe
-          body: |
-            ${{ steps.release_notes.outputs.notes }}
-            
-            ---
-            **Полный список изменений:** [CHANGELOG.md](https://github.com/mashingaan/AirDocs/blob/main/airdocs/CHANGELOG.md)
+          body: ${{ steps.release_notes.outputs.notes }}
           draft: false
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create source.tar.gz
+        run: |
+          git archive -o airdocs/dist/source.tar.gz HEAD
       
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: AirDocs-${{ steps.get_version.outputs.VERSION }}
-          path: airdocs/dist/AirDocs_${{ steps.get_version.outputs.VERSION }}.zip
+          name: AirDocs-v${{ steps.get_version.outputs.VERSION }}-WIN-${{ matrix.os }}
+          path: |
+            airdocs/dist/AirDocs_v${{ steps.get_version.outputs.VERSION }}_WIN.zip
+            airdocs/dist/AirDocs/AirDocs_${{ steps.get_version.outputs.VERSION }}.exe
+            airdocs/dist/source.tar.gz
           retention-days: 30
+
+

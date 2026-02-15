@@ -3,7 +3,7 @@
 
 application:
   name: "Рабочее место экспедитора"
-  version: "0.1.0"
+  version: "0.2.2"
   language: "ru"
 
 # Paths configuration
@@ -101,8 +101,8 @@ documents:
 # UI settings
 ui:
   # Window size
-  window_width: 1200
-  window_height: 800
+  window_width: 1400
+  window_height: 900
   # Date format for display
   date_format: "%d.%m.%Y"
   # Number formats
