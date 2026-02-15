@@ -8,8 +8,8 @@ from typing import Tuple
 logger = logging.getLogger("airdocs.core")
 
 # SemVer format: MAJOR.MINOR.PATCH
-VERSION = "0.2.1"
-__version_info__ = (0, 2, 1)
+VERSION = "0.2.2"
+__version_info__ = (0, 2, 2)
 
 # Version parsing regex
 VERSION_PATTERN = re.compile(
@@ -133,3 +133,4 @@ def is_newer_version(current: str, available: str) -> bool:
         True if available > current
     """
     return compare_versions(current, available) < 0
+
