@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.4] - 2026-02-15
+
+### Fixed
+- Исправлена ошибка "Configuration file not found" при запуске onefile EXE
+- Добавлен `resources_dir` для корректной загрузки config/templates из PyInstaller bundle
+- Config файлы теперь копируются в `data/config/` для пользовательских настроек
+- Улучшено логирование путей при инициализации (`sys.executable`, `sys._MEIPASS`)
+
+### Changed
+- `AppContext.resources_dir`: возвращает `sys._MEIPASS` в frozen режиме, иначе source dir
+- Конфиги загружаются из `resources_dir/config/`, с fallback на `data/config/` для overrides
+
 ## [0.2.2] - 2026-02-15
 
 ### Fixed
